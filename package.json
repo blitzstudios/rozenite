@@ -1,0 +1,51 @@
+{
+  "name": "@rozenite/runtime",
+  "version": "1.0.0",
+  "description": "Rozenite runtime for React Native DevTools.",
+  "keywords": [
+    "devtools",
+    "framework",
+    "orchestration",
+    "plugin",
+    "react-native"
+  ],
+  "homepage": "https://github.com/callstackincubator/rozenite#readme",
+  "bugs": {
+    "url": "https://github.com/callstackincubator/rozenite/issues"
+  },
+  "license": "MIT",
+  "author": "Szymon Chmal <szymon.chmal@callstack.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/callstackincubator/rozenite.git"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/host.d.ts",
+      "import": "./dist/host.js",
+      "require": "./dist/host.cjs"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.lib.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest --run --passWithNoTests"
+  },
+  "dependencies": {
+    "@rozenite/tools": "2.4.0",
+    "tslib": "^2.3.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "upstreamVersion": "2.4.0"
+}
