@@ -1,0 +1,62 @@
+{
+  "name": "@rozenite/middleware",
+  "version": "1.0.0",
+  "description": "Middleware for Rozenite.",
+  "keywords": [
+    "bundler",
+    "devtools",
+    "middleware",
+    "plugin",
+    "react-native"
+  ],
+  "homepage": "https://github.com/callstackincubator/rozenite#readme",
+  "bugs": {
+    "url": "https://github.com/callstackincubator/rozenite/issues"
+  },
+  "license": "MIT",
+  "author": "Szymon Chmal <szymon.chmal@callstack.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/callstackincubator/rozenite.git"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.lib.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest --run --passWithNoTests"
+  },
+  "dependencies": {
+    "@rozenite/agent-shared": "2.4.0",
+    "@rozenite/app": "2.4.0",
+    "@rozenite/runtime": "blitzstudios/rozenite.git#rozenite-runtime-v1.0.0-gitpkg",
+    "@rozenite/shell": "2.4.0",
+    "@rozenite/tools": "2.4.0",
+    "express": "^5.1.0",
+    "semver": "^7.7.2",
+    "tslib": "^2.3.0",
+    "ws": "^8.18.3"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "upstreamVersion": "2.4.0"
+}
