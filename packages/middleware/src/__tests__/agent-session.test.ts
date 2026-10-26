@@ -151,6 +151,14 @@ const mocks = vi.hoisted(() => {
       };
     }
 
+    if (expression.includes(`${RUNTIME_GLOBAL}.initializeDomain(`)) {
+      return {
+        result: {
+          value: true,
+        },
+      };
+    }
+
     return {};
   };
 
@@ -852,6 +860,30 @@ describe('agent session', () => {
             expression.includes('\\"type\\":\\"query\\"'),
         ),
       ).toBe(true);
+    });
+
+    it('holds messages sent during a reload until the new context initializes the domain', async () => {
+      const { session, socket } = await bootstrapSession();
+      const sentQuery = () =>
+        getExpressions().some(
+          (expression) =>
+            expression.includes('sendMessage("rozenite"') &&
+            expression.includes('\\"type\\":\\"query\\"'),
+        );
+
+      socket.emit('message', JSON.stringify({ method: 'Runtime.executionContextsCleared' }));
+      await session.sendTapMessage({
+        pluginId: '@acme/sqlite-plugin',
+        type: 'query',
+        payload: { sql: 'select 1' },
+      });
+
+      expect(sentQuery()).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(500);
+      await flushMicrotasks();
+
+      expect(sentQuery()).toBe(true);
     });
 
     it('rejects sendTapMessage when the session is not connected', async () => {

@@ -42,6 +42,7 @@ const PLUGIN_READINESS_QUIET_WINDOW_MS = 50;
 const PLUGIN_READINESS_MAX_WAIT_MS = 250;
 const RECOVERY_RETRY_DELAY_MS = 500;
 const RECOVERY_MAX_ATTEMPTS = 16;
+const MAX_QUEUED_DOMAIN_MESSAGES = 1000;
 
 const RECOVERABLE_CLOSE_REASONS = new Set([
   '[RECREATING_DEVICE]',
@@ -374,14 +375,35 @@ export const createAgentSession = (options: {
     }, BOOTSTRAP_DELAY_MS);
   };
 
-  const sendDomainMessage = (domain: string, message: unknown): Promise<void> => {
+  // Until bootstrap initializes a domain in the current JS context, the app's dispatcher throws for messages to it, and
+  // an exception from Runtime.evaluate is uncaught in the app (a debugger pausing on those freezes it), so messages wait.
+  const readyDomains = new Set<string>();
+  let queuedDomainMessages: [domain: string, message: unknown][] = [];
+
+  const evaluateDomainMessage = (domain: string, message: unknown): Promise<void> => {
     const serializedMessage = JSON.stringify(message);
     const escapedMessage = JSON.stringify(serializedMessage);
     return markPromiseAsHandled(
       sendCommand('Runtime.evaluate', {
-        expression: `${RUNTIME_GLOBAL}.sendMessage(${JSON.stringify(domain)}, ${escapedMessage})`,
+        expression: `void (() => { try { ${RUNTIME_GLOBAL}.sendMessage(${JSON.stringify(domain)}, ${escapedMessage}); } catch (e) {} })()`,
       }).then(() => undefined),
     );
+  };
+
+  const sendDomainMessage = (domain: string, message: unknown): Promise<void> => {
+    if (!readyDomains.has(domain)) {
+      queuedDomainMessages.push([domain, message]);
+      if (queuedDomainMessages.length > MAX_QUEUED_DOMAIN_MESSAGES) {
+        queuedDomainMessages.shift();
+      }
+      return Promise.resolve();
+    }
+    return evaluateDomainMessage(domain, message);
+  };
+
+  const resetDomains = (): void => {
+    readyDomains.clear();
+    queuedDomainMessages = [];
   };
 
   const sendAgentSessionReady = async (): Promise<void> => {
@@ -454,6 +476,24 @@ export const createAgentSession = (options: {
     }
   };
 
+  const initializeRuntimeDomain = async (domain: string): Promise<void> => {
+    const response = await evaluateRuntime(
+      `(() => { try { ${RUNTIME_GLOBAL}.initializeDomain(${JSON.stringify(domain)}); return true; } catch (e) { return String(e && e.message || e); } })()`,
+      true,
+    );
+    if (response.result?.value !== true) {
+      throw new Error(
+        `Failed to initialize the ${domain} domain: ${String(response.result?.value ?? response.exceptionDetails?.text)}`,
+      );
+    }
+    readyDomains.add(domain);
+    const flushed = queuedDomainMessages.filter(([queuedDomain]) => queuedDomain === domain);
+    queuedDomainMessages = queuedDomainMessages.filter(([queuedDomain]) => queuedDomain !== domain);
+    for (const [, queuedMessage] of flushed) {
+      void evaluateDomainMessage(domain, queuedMessage);
+    }
+  };
+
   const getBindingName = async (): Promise<string> => {
     const response = await evaluateRuntime(`${RUNTIME_GLOBAL}.BINDING_NAME`);
 
@@ -501,15 +541,11 @@ export const createAgentSession = (options: {
         bindingName = bindingValue;
       }
 
-      await sendCommand('Runtime.evaluate', {
-        expression: `void ${RUNTIME_GLOBAL}.initializeDomain("rozenite")`,
-      });
+      await initializeRuntimeDomain('rozenite');
       // Arm before notifying the plugin: registration may be synchronous.
       beginPluginReadinessWait();
       await sendAgentSessionReady();
-      await sendCommand('Runtime.evaluate', {
-        expression: `void ${RUNTIME_GLOBAL}.initializeDomain("react-devtools")`,
-      });
+      await initializeRuntimeDomain('react-devtools');
 
       bootstrapped = true;
       if (pluginReadinessSatisfied) {
@@ -569,6 +605,7 @@ export const createAgentSession = (options: {
   const teardownConnection = (): void => {
     bindingName = null;
     bootstrapped = false;
+    resetDomains();
     connectedAt = undefined;
     rejectStartReadiness(new Error('CDP connection closed before bootstrap completed'));
     handler.disconnectDevice(options.target.id);
@@ -669,6 +706,7 @@ export const createAgentSession = (options: {
     logDisconnected();
     bindingName = null;
     bootstrapped = false;
+    resetDomains();
     connectedAt = undefined;
     rejectStartReadiness(new Error('CDP connection closed before bootstrap completed'));
 
@@ -761,11 +799,13 @@ export const createAgentSession = (options: {
         MAIN_EXECUTION_CONTEXT_NAME
     ) {
       bootstrapped = false;
+      readyDomains.clear();
       scheduleBootstrap();
     }
 
     if (message.method === 'Runtime.executionContextsCleared') {
       bootstrapped = false;
+      readyDomains.clear();
       scheduleBootstrap();
     }
 
