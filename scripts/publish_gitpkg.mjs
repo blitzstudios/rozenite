@@ -66,9 +66,13 @@ delete manifest.devDependencies;
 
 run('pnpm', ['turbo', 'run', 'build', `--filter=${manifest.name}`], { stdio: 'inherit' });
 
+const license = path.join(dir, 'LICENSE');
+const copiesLicense = !fs.existsSync(license);
 try {
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  if (copiesLicense) fs.copyFileSync(path.join(root, 'LICENSE'), license);
   execFileSync('gitpkg', ['publish'], { cwd: dir, stdio: 'inherit' });
 } finally {
   fs.writeFileSync(manifestPath, original);
+  if (copiesLicense) fs.rmSync(license, { force: true });
 }
