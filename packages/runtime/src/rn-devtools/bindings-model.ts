@@ -147,7 +147,7 @@ export class RozeniteBindingsModel extends SDK.SDKModel.SDKModel {
 
       if (this.fuseboxDispatcherIsInitialized) {
         // This should never happen.
-        // It is expected that messages are flushed out right after we notify listeners with BackendExecutionContextCreated event
+        // It is expected that messages are flushed out as soon as initializeDomain succeeds
         if (!this.isDomainMessagesQueueEmpty()) {
           throw new Error(
             `Attempted to send a message to domain ${domainName} while queue is not empty`,
@@ -212,9 +212,21 @@ export class RozeniteBindingsModel extends SDK.SDKModel.SDKModel {
       );
     }
 
-    await runtimeModel.agent.invoke_evaluate({
-      expression: `void ${RUNTIME_GLOBAL}.initializeDomain('${DOMAIN_NAME}')`,
+    // Each JS context has its own domains, so a reload needs this again. Until then sendMessage drops messages, since
+    // the app throws for them and a debugger pausing on uncaught exceptions would freeze it.
+    const response = await runtimeModel.agent.invoke_evaluate({
+      expression: `(() => { try { ${RUNTIME_GLOBAL}.initializeDomain('${DOMAIN_NAME}'); return true; } catch (e) { return String(e && e.message || e); } })()`,
+      returnByValue: true,
     });
+    if (response.result?.value !== true) {
+      throw new Error(
+        `Failed to initialize the ${DOMAIN_NAME} domain: ` +
+          String(response.result?.value ?? response.exceptionDetails?.text),
+      );
+    }
+
+    this.fuseboxDispatcherIsInitialized = true;
+    this.flushOutDomainMessagesQueues();
   }
 
   async sendMessage(message: JSONValue): Promise<void> {
@@ -237,7 +249,7 @@ export class RozeniteBindingsModel extends SDK.SDKModel.SDKModel {
 
     // Note: Double quote must be used in case we get a string with a nested JSON object.
     await runtimeModel.agent.invoke_evaluate({
-      expression: `${RUNTIME_GLOBAL}.sendMessage('${DOMAIN_NAME}', ${escapedMessage})`,
+      expression: `void (() => { try { ${RUNTIME_GLOBAL}.sendMessage('${DOMAIN_NAME}', ${escapedMessage}); } catch (e) {} })()`,
     });
   }
 
@@ -331,7 +343,6 @@ export class RozeniteBindingsModel extends SDK.SDKModel.SDKModel {
     void this.waitForFuseboxDispatcherToBeInitialized()
       .then(() => {
         this.dispatchEventToListeners('BackendExecutionContextCreated');
-        this.flushOutDomainMessagesQueues();
       })
       .catch((error: Error) =>
         this.dispatchEventToListeners('BackendExecutionContextUnavailable', error.message),
@@ -384,7 +395,6 @@ export class RozeniteBindingsModel extends SDK.SDKModel.SDKModel {
           );
         }
 
-        this.fuseboxDispatcherIsInitialized = true;
         return;
       });
   }

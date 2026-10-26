@@ -126,7 +126,10 @@ export class RozenitePluginModel extends SDK.SDKModel.SDKModel {
     if (!rdtBindingsModel.isEnabled()) {
       this.ensureInitialized();
     } else {
-      this.#finishInitializationAndNotify();
+      rdtBindingsModel.initializeDomain().then(
+        () => this.#finishInitializationAndNotify(),
+        (error: Error) => this.dispatchEventToListeners('InitializationFailed', error.message),
+      );
     }
   }
 
