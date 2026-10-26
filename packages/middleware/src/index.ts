@@ -51,7 +51,8 @@ export const initializeRozenite = async (
   const allInstalledPlugins = await getInstalledPlugins(options);
   const agentSessionManager = createAgentSessionManager({
     projectRoot: options.projectRoot,
-    metroVersion: getPackageJSON().version,
+    // The fork numbers its own releases; agents compare against the upstream release it is built from.
+    metroVersion: getPackageJSON().upstreamVersion,
     // Which integration this dev server hosts. Every session it serves
     // resolves its CDP capability profile from this.
     integration: options.integration,

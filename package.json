@@ -26,7 +26,8 @@
     "start:playground": "pnpm --filter @rozenite/playground start",
     "start:playground:android": "pnpm --filter @rozenite/playground android",
     "start:playground:ios": "pnpm --filter @rozenite/playground ios",
-    "start:ui-storybook": "pnpm --filter ui-storybook storybook"
+    "start:ui-storybook": "pnpm --filter ui-storybook storybook",
+    "publish:gitpkg": "node scripts/publish_gitpkg.mjs"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.5.2",

@@ -1,6 +1,6 @@
 {
   "name": "@rozenite/middleware",
-  "version": "2.4.0",
+  "version": "1.0.0",
   "description": "Middleware for Rozenite.",
   "keywords": [
     "bundler",
@@ -65,5 +65,6 @@
   },
   "engines": {
     "node": ">=20.19.0"
-  }
+  },
+  "upstreamVersion": "2.4.0"
 }
